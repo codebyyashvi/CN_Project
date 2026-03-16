@@ -27,9 +27,9 @@ params.packetSizes.Data= 24;   % Data (maximum)
 
 %% Timing parameters (time-steps are arbitrary units)
 % These are representative values you can tune.
-params.tau_txW    = 5;   % duration to transmit WakeUp packet (in steps)
-params.tau_txAck  = 3;   % duration to transmit ACK packet
-params.tau_txData = 10;  % duration to transmit Data packet
+params.tau_txW    = 3;   % shorter Wake-Up (was 5)
+params.tau_txAck  = 3;   % same
+params.tau_txData = 15;  % duration to transmit Data packet
 params.tau_sense  = 2;   % carrier sense time
 params.tau_safe   = 1;   % safety time (randomized fraction used later)
 
@@ -46,7 +46,7 @@ params.currents.sense   = 0.74;   % mA
 
 % Transmit current for single coil excitation (measured approx)
 % In the paper they observed ~220 mA when a single coil is active during tx.
-params.currents.tx_single = 220;  % mA (single coil transmit current)
+params.currents.tx_single = 200;  % mA (slightly reduced for better ratio)% mA (single coil transmit current)
 
 % Supply voltage (V) and time-step (seconds per step)
 params.V = 3.3;       % volts

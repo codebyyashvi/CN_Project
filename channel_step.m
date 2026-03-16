@@ -1,7 +1,7 @@
 function [channel, nodes, stats] = channel_step(channel, nodes, params, stats, t)
 % channel_step.m
 % Resolves transmissions, collisions, and updates channel state
-% Now extended to measure energy and current wasted due to collisions.
+% Extended version for realistic energy & current waste modeling.
 
 N = length(nodes);
 
@@ -26,37 +26,35 @@ end
 % ---------------- Collision Handling ----------------
 if numActive > 1
     % --- Collision detected ---
+    stats.collisions = stats.collisions + 1;
+
     for idx = 1:numActive
         node_id = activeTxNodes(idx);
+        pktType = nodes(node_id).current_tx.type;
+
+        % --- Calculate energy & current wasted based on coil config ---
+        [dur, eTotal] = coil_tx_params(pktType, params.config, params);
+
+        % TX wasted energy (total per collided node)
+        stats.energy_wasted_tx = stats.energy_wasted_tx + eTotal;
+
+        % RX wasted energy (approx. receiver listening during collision)
+        stats.energy_wasted_rx = stats.energy_wasted_rx + ...
+            params.energy_per_step.receive * dur;
+
+        % TX/RX wasted currents (in A·s)
+        I_tx = params.currents.tx_single / 1000;
+        I_rx = params.currents.receive / 1000;
+        stats.current_wasted_tx = stats.current_wasted_tx + I_tx * (params.dt * dur);
+        stats.current_wasted_rx = stats.current_wasted_rx + I_rx * (params.dt * dur);
+
+        % --- Reset node state ---
         nodes(node_id).stats.collisions = nodes(node_id).stats.collisions + 1;
         nodes(node_id).current_tx = [];
         nodes(node_id).state = 'Backoff';
-        nodes(node_id).timer = ceil(params.tau_wait_base * (0.5 + rand())); % random backoff
+        nodes(node_id).timer = ceil(params.tau_wait_base * (0.5 + rand()));
     end
 
-    % Update collision stats
-    stats.collisions = stats.collisions + 1;
-
-    % --- Energy and current wasted calculations ---
-    V = params.V;                  % voltage (V)
-    I_tx = params.currents.tx_single / 1000; % convert mA to A
-    I_rx = params.currents.receive / 1000;   % convert mA to A
-    t_tx = params.dt * params.tau_txData;    % transmission duration (s)
-    t_rx = params.dt * params.tau_txData;    % receive duration (s)
-
-    % Energy wasted per node in this collision
-    E_tx = V * I_tx * t_tx;
-    E_rx = V * I_rx * t_rx;
-
-    % Add to totals (Tx and Rx)
-    stats.energy_wasted_tx = stats.energy_wasted_tx + numActive * E_tx;
-    stats.energy_wasted_rx = stats.energy_wasted_rx + numActive * E_rx;
-
-    % Equivalent wasted current (I = E / (V * t))
-    stats.current_wasted_tx = stats.energy_wasted_tx / (V * t_tx);
-    stats.current_wasted_rx = stats.energy_wasted_rx / (V * t_rx);
-
-    % Channel state update
     channel.state = 'busy';
     channel.transmissions = [];
 
@@ -78,7 +76,7 @@ elseif numActive == 1
     channel.transmissions = node_id;
 
 else
-    % --- No transmission (idle channel) ---
+    % --- Idle channel ---
     channel.state = 'free';
     channel.transmissions = [];
 end
